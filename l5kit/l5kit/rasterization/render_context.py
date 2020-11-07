@@ -27,9 +27,16 @@ class RenderContext:
 
         scaling = 1.0 / pixel_size_m  # scaling factor from world to raster space [pixels per meter]
         center_in_raster_px = center_in_raster_ratio * raster_size_px
-        self.raster_from_local = np.array(
-            [[scaling[0], 0, center_in_raster_px[0]], [0, scaling[1], center_in_raster_px[1]], [0, 0, 1]]
-        )
+        self.raster_from_local = np.array([
+            [scaling[0], 0., center_in_raster_px[0]],
+            [0., scaling[1], center_in_raster_px[1]],
+            [0., 0., 1.],
+        ])
+        self.inv_raster_from_local = np.array([
+            [1. / scaling[0], 0., -center_in_raster_px[0] / scaling[0]],
+            [0., 1. / scaling[1], -center_in_raster_px[1] / scaling[1]],
+            [0., 0., 1.],
+        ])
 
     def raster_from_world(self, position_m: np.ndarray, angle_rad: float) -> np.ndarray:
         """
@@ -44,14 +51,44 @@ class RenderContext:
             (np.ndarray): a transformation matrix from world coordinates to raster coordinates
         """
         # Compute pose from its position and rotation
-        pose_in_world = np.array(
-            [
-                [np.cos(angle_rad), -np.sin(angle_rad), position_m[0]],
-                [np.sin(angle_rad), np.cos(angle_rad), position_m[1]],
-                [0, 0, 1],
-            ]
-        )
+        c = np.cos(angle_rad)
+        s = np.sin(angle_rad)
+        # pose_in_world = np.array([
+        #     [c, -s, position_m[0]],
+        #     [s, c, position_m[1]],
+        #     [0, 0, 1],
+        # ])
+        pp = np.array([[c, s], [-s, c]]) @ position_m[:2]
+        pose_from_world = np.array([
+            [c, s, -pp[0]],
+            [-s, c, -pp[1]],
+            [0., 0., 1.],
+        ])
 
-        pose_from_world = np.linalg.inv(pose_in_world)
+        # pose_from_world = np.linalg.inv(pose_in_world)
         raster_from_world = self.raster_from_local @ pose_from_world
         return raster_from_world
+
+    def world_from_raster(self, position_m: np.ndarray, angle_rad: float) -> np.ndarray:
+        """
+        Return a matrix to convert a pose in raster coordinates into world coordinates
+
+        Args:
+            render_context (RenderContext): the context for rasterisation
+            position_m (np.ndarray): XY position in world coordinates
+            angle_rad (float): rotation angle in world coordinates
+
+        Returns:
+            (np.ndarray): a transformation matrix from raster coordinates to world coordinates
+        """
+        # Compute pose from its position and rotation
+        c = np.cos(angle_rad)
+        s = np.sin(angle_rad)
+        pose_in_world = np.array([
+            [c, -s, position_m[0]],
+            [s, c, position_m[1]],
+            [0., 0., 1.],
+        ])
+
+        world_from_raster = pose_in_world @ self.inv_raster_from_local
+        return world_from_raster

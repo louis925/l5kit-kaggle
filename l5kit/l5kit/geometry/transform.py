@@ -16,13 +16,24 @@ def compute_agent_pose(agent_centroid_m: np.ndarray, agent_yaw_rad: float) -> np
         (np.ndarray): 3x3 world_from_agent matrix
     """
     # Compute agent pose from its position and heading
-    return np.array(
-        [
-            [np.cos(agent_yaw_rad), -np.sin(agent_yaw_rad), agent_centroid_m[0]],
-            [np.sin(agent_yaw_rad), np.cos(agent_yaw_rad), agent_centroid_m[1]],
-            [0, 0, 1],
-        ]
-    )
+    s = np.sin(agent_yaw_rad)
+    c = np.cos(agent_yaw_rad)
+    return np.array([
+        [c, -s, agent_centroid_m[0]],
+        [s, c, agent_centroid_m[1]],
+        [0., 0., 1.],
+    ])
+
+
+def inv_agent_pose(agent_centroid_m: np.ndarray, agent_yaw_rad: float) -> np.ndarray:
+    s = np.sin(agent_yaw_rad)
+    c = np.cos(agent_yaw_rad)
+    ap = np.array([[c, s], [-s, c]]) @ agent_centroid_m
+    return np.array([
+        [c, s, -ap[0]],
+        [-s, c, -ap[1]],
+        [0, 0, 1],
+    ])
 
 
 def rotation33_as_yaw(rotation: np.ndarray) -> float:

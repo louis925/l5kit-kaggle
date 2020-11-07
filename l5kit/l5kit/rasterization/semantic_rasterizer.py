@@ -132,7 +132,8 @@ class SemanticRasterizer(Rasterizer):
             ego_yaw_rad = agent["yaw"]
 
         raster_from_world = self.render_context.raster_from_world(ego_translation_m, ego_yaw_rad)
-        world_from_raster = np.linalg.inv(raster_from_world)
+        # world_from_raster = np.linalg.inv(raster_from_world)
+        world_from_raster = self.render_context.world_from_raster(ego_translation_m, ego_yaw_rad)
 
         # get XY of center pixel in world coordinates
         center_in_raster_px = np.asarray(self.raster_size) * (0.5, 0.5)

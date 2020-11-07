@@ -2,6 +2,7 @@ from .angle import angle_between_vectors, angular_distance, compute_yaw_around_n
 from .image import crop_rectangle_from_image
 from .transform import (
     compute_agent_pose,
+    inv_agent_pose,
     ecef_to_geodetic,
     flip_y_axis,
     geodetic_to_ecef,
@@ -28,4 +29,5 @@ __all__ = [
     "normalize_intensity",
     "angular_distance",
     "compute_agent_pose",
+    "inv_agent_pose",
 ]

@@ -56,8 +56,9 @@ class SatelliteRasterizer(Rasterizer):
             ego_translation_m = np.append(agent["centroid"], history_frames[0]["ego_translation"][-1])
             ego_yaw_rad = agent["yaw"]
 
-        raster_from_world = self.render_context.raster_from_world(ego_translation_m, ego_yaw_rad)
-        world_from_raster = np.linalg.inv(raster_from_world)
+        # raster_from_world = self.render_context.raster_from_world(ego_translation_m, ego_yaw_rad)
+        # world_from_raster = np.linalg.inv(raster_from_world)
+        world_from_raster = self.render_context.world_from_raster(ego_translation_m, ego_yaw_rad)
 
         # Transform raster center to satellite coordinates (consider also z here)
         center_in_raster_px = np.asarray(self.raster_size) * (0.5, 0.5)
