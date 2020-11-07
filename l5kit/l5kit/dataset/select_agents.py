@@ -23,7 +23,7 @@ from l5kit.geometry import angular_distance
 if sys.platform == "darwin":
     multiprocessing.set_start_method("fork", force=True)  # this fixes loop in python 3.8 on MacOS
 
-os.environ["BLOSC_NOLOCK"] = "1"  # this is required for multiprocessing
+# os.environ["BLOSC_NOLOCK"] = "1"  # this is required for multiprocessing
 
 TH_YAW_DEGREE = 30
 TH_EXTENT_RATIO = 1.1
