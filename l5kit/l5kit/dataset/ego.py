@@ -116,22 +116,22 @@ None if not desired
         frames = self.dataset.frames[get_frames_slice_from_scenes(self.dataset.scenes[scene_index])]
 
         tl_faces = self.dataset.tl_faces
-        try:
-            if self.cfg["raster_params"]["disable_traffic_light_faces"]:
-                tl_faces = np.empty(0, dtype=self.dataset.tl_faces.dtype)  # completely disable traffic light faces
-        except KeyError:
-            warnings.warn(
-                "disable_traffic_light_faces not found in config, this will raise an error in the future",
-                RuntimeWarning,
-                stacklevel=2,
-            )
+        # try:
+        #     if self.cfg["raster_params"]["disable_traffic_light_faces"]:
+        #         tl_faces = np.empty(0, dtype=self.dataset.tl_faces.dtype)  # completely disable traffic light faces
+        # except KeyError:
+        #     warnings.warn(
+        #         "disable_traffic_light_faces not found in config, this will raise an error in the future",
+        #         RuntimeWarning,
+        #         stacklevel=2,
+        #     )
         data = self.sample_function(state_index, frames, self.dataset.agents, tl_faces, track_id)
 
         # add information only, so that all data keys are always preserved
-        data["host_id"] = self.dataset.scenes[scene_index]["host"]
+        # data["host_id"] = self.dataset.scenes[scene_index]["host"]
         data["timestamp"] = frames[state_index]["timestamp"]
         data["track_id"] = np.int64(-1 if track_id is None else track_id)  # always a number to avoid crashing torch
-        data["world_to_image"] = data["raster_from_world"]  # TODO deprecate
+        # data["world_to_image"] = data["raster_from_world"]  # TODO deprecate
 
         # when rast is None, image could be None. In that case we remove the key
         if data["image"] is not None:
