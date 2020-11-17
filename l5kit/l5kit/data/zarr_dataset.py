@@ -141,9 +141,9 @@ opened.
             )
         else:
             self.root = zarr.open_group(self.path, mode=mode)
-        self.frames = self.root[FRAME_ARRAY_KEY]
+        self.frames = self.root[FRAME_ARRAY_KEY][:]
         self.agents = self.root[AGENT_ARRAY_KEY]
-        self.scenes = self.root[SCENE_ARRAY_KEY]
+        self.scenes = self.root[SCENE_ARRAY_KEY][:]
         try:
             self.tl_faces = self.root[TL_FACE_ARRAY_KEY]
         except KeyError:

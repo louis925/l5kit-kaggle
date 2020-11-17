@@ -67,6 +67,7 @@ None if not desired
         self.dataset = zarr_dataset
         self.rasterizer = rasterizer
 
+        # map: scene_id -> frame_last_id+1
         self.cumulative_sizes = self.dataset.scenes["frame_index_interval"][:, 1]
 
         render_context = RenderContext(
@@ -113,7 +114,10 @@ None if not desired
             the agent track (-1 if ego) and the timestamp
 
         """
-        frames = self.dataset.frames[get_frames_slice_from_scenes(self.dataset.scenes[scene_index])]
+        frames = self.dataset.frames[
+            slice(*self.dataset.scenes[scene_index]["frame_index_interval"])
+        ]
+        # frames = self.dataset.frames[get_frames_slice_from_scenes(self.dataset.scenes[scene_index])]
 
         tl_faces = self.dataset.tl_faces
         # try:
