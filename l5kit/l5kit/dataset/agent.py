@@ -67,7 +67,7 @@ class AgentDataset(EgoDataset):
         self.agents_mask = agents_mask
 
         # map: valid_agent_id -> track_id
-        self.valid_agent_id_to_track_id = self.dataset.agents['track_id'][self.agents_indices]
+        # self.valid_agent_id_to_track_id = self.dataset.agents['track_id'][self.agents_indices]
 
     def load_agents_mask(self) -> np.ndarray:
         """
@@ -118,7 +118,7 @@ class AgentDataset(EgoDataset):
             index = len(self) + index
 
         total_agent_id = self.agents_indices[index]  # map from valid_agent_id to total_agent_id
-        track_id = self.valid_agent_id_to_track_id[index]  # the car id
+        # track_id = self.valid_agent_id_to_track_id[index]  # the car id
         frame_index = bisect.bisect_right(self.cumulative_sizes_agents, total_agent_id)
         scene_index = bisect.bisect_right(self.cumulative_sizes, frame_index)
 
@@ -127,7 +127,8 @@ class AgentDataset(EgoDataset):
         #     state_index = frame_index
         # else:
         #     state_index = frame_index - self.cumulative_sizes[scene_index - 1]
-        return self.get_frame(scene_index, state_index, track_id=track_id)
+        # return self.get_frame(scene_index, state_index, track_id=track_id)
+        return self.get_frame(scene_index, state_index, total_agent_id=total_agent_id)
 
     def get_scene_dataset(self, scene_index: int) -> "AgentDataset":
         """

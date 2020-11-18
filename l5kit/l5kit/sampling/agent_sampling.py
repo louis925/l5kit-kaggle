@@ -8,7 +8,7 @@ from ..data import (
     get_agents_slice_from_frames,
     get_tl_faces_slice_from_frames,
 )
-from ..data.filter import filter_agents_by_frames, filter_agents_by_track_id
+from ..data.filter import filter_agents_by_frames, filter_agents_by_track_id, is_valid_agent_by_labels
 from ..geometry import angular_distance, compute_agent_pose, inv_agent_pose, rotation33_as_yaw, transform_point
 from ..kinematic import Perturbation
 from ..rasterization import EGO_EXTENT_HEIGHT, EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, Rasterizer, RenderContext
@@ -20,7 +20,7 @@ def generate_agent_sample(
     frames: np.ndarray,
     agents: np.ndarray,
     tl_faces: np.ndarray,
-    selected_track_id: Optional[int],
+    selected_agent_id: int,
     render_context: RenderContext,
     history_num_frames: int,
     history_step_size: int,
@@ -44,7 +44,10 @@ def generate_agent_sample(
         frames (np.ndarray): The scene frames array, can be numpy array or a zarr array
         agents (np.ndarray): The full agents array, can be numpy array or a zarr array
         tl_faces (np.ndarray): The full traffic light faces array, can be numpy array or a zarr array
-        selected_track_id (Optional[int]): Either None for AV, or the ID of an agent that you want to
+        # selected_track_id (Optional[int]): Either None for AV, or the ID of an agent that you want to
+        # predict the future of. This agent is centered in the raster and the returned targets are derived from
+        # their future states.
+        selected_agent_id (int): Either -1 for AV, or the total_agent_id of an agent that you want to
         predict the future of. This agent is centered in the raster and the returned targets are derived from
         their future states.
         raster_size (Tuple[int, int]): Desired output raster dimensions
@@ -82,11 +85,14 @@ to train models that can recover from slight divergence from training set data
     # agent_slice = get_agents_slice_from_frames(history_frames[-1], future_frames[-1])
     agent_slice = slice(
         history_frames[-1]["agent_index_interval"][0],
-        future_frames[-1]["agent_index_interval"][1]
+        (future_frames[-1] if len(future_frames) > 0
+         else history_frames[0])["agent_index_interval"][1]
     )
+    # read the slice of agents from disk
     agents = agents[agent_slice].copy()  # this is the minimum slice of agents we need
     history_frames["agent_index_interval"] -= agent_slice.start  # sync interval with the agents array
     future_frames["agent_index_interval"] -= agent_slice.start  # sync interval with the agents array
+    local_agent_id = selected_agent_id - agent_slice.start
     history_agents = filter_agents_by_frames(history_frames, agents)
     future_agents = filter_agents_by_frames(future_frames, agents)
 
@@ -104,13 +110,15 @@ to train models that can recover from slight divergence from training set data
     # cur_frame = history_frames[0]
     # cur_agents = history_agents[0]
 
-    if selected_track_id is None:
+    # if selected_track_id is None:
+    if selected_agent_id < 0:
         # For Ego
         # State you want to predict the future of.
         cur_frame = history_frames[0]
         agent_centroid_m = cur_frame["ego_translation"][:2]
         agent_yaw_rad = rotation33_as_yaw(cur_frame["ego_rotation"])
         agent_extent_m = np.asarray((EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, EGO_EXTENT_HEIGHT))
+        selected_track_id = None
         selected_agent = None
     else:
         # For the target Agent
@@ -119,9 +127,10 @@ to train models that can recover from slight divergence from training set data
         # cur_agents = history_agents[0]
         # this will raise IndexError if the agent is not in the frame or under agent-threshold
         # this is a strict error, we cannot recover from this situation
-        selected_agent = filter_agents_by_track_id(
-            filter_agents_by_labels(history_agents[0], filter_agents_threshold), selected_track_id
-        )[0]
+        selected_agent = agents[local_agent_id]
+        selected_track_id = selected_agent['track_id']
+        if not is_valid_agent_by_labels(selected_agent):
+            raise ValueError(f" track_id {selected_track_id} not in frame or below threshold")
         # try:
         #     agent = filter_agents_by_track_id(
         #         filter_agents_by_labels(cur_agents, filter_agents_threshold), selected_track_id
@@ -133,7 +142,7 @@ to train models that can recover from slight divergence from training set data
         agent_extent_m = selected_agent["extent"]
         # selected_agent = agent
 
-    # Generate the image
+    # Generate the image (most computation intense part)
     input_im = (
         None
         if not rasterizer
@@ -187,8 +196,9 @@ to train models that can recover from slight divergence from training set data
         "world_from_agent": world_from_agent,
         "centroid": agent_centroid_m,
         "yaw": agent_yaw_rad,
-        "speed": np.linalg.norm(future_vels_mps[0]),
+        "speed": np.linalg.norm(future_vels_mps[0]),  # Louis: can be deleted
         "extent": agent_extent_m,
+        "track_id": np.int64(-1 if selected_track_id is None else selected_track_id),
     }
 
 

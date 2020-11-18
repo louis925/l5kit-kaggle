@@ -61,6 +61,26 @@ def filter_agents_by_labels(agents: np.ndarray, threshold: float = 0.5) -> np.nd
     ]
 
 
+def is_valid_agent_by_labels(agent: np.ndarray, threshold: float = 0.5) -> bool:
+    """Check if the agent meets the threshold.
+
+    Arguments:
+        agent (np.ndarray): single Agent array
+
+    Keyword Arguments:
+        threshold (float): probability threshold for filtering (default: {0.5})
+
+    Returns:
+        boolean
+    """
+    return (
+        np.sum(
+            agent["label_probabilities"][PERCEPTION_LABEL_INDICES_TO_KEEP],
+            axis=0
+        ) > threshold
+    )
+
+
 def filter_agents_by_track_id(agents: np.ndarray, track_id: int) -> np.ndarray:
     """Return all agent object (np.ndarray) of a given track_id.
 

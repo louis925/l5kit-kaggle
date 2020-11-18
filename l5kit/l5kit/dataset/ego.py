@@ -103,14 +103,16 @@ None if not desired
         """
         return len(self.dataset.frames)
 
-    def get_frame(self, scene_index: int, state_index: int, track_id: Optional[int] = None) -> dict:
+    # def get_frame(self, scene_index: int, state_index: int, track_id: Optional[int] = None) -> dict:
+    def get_frame(self, scene_index: int, state_index: int, total_agent_id: int) -> dict:
         """
         A utility function to get the rasterisation and trajectory target for a given agent in a given frame
 
         Args:
             scene_index (int): the index of the scene in the zarr
             state_index (int): a relative frame index in the scene
-            track_id (Optional[int]): the agent to rasterize or None for the AV
+            # track_id (Optional[int]): the agent to rasterize or None for the AV
+            total_agent_id (int): the total_agent_id of the agent to rasterize or -1 for the AV
         Returns:
             dict: the rasterised image in (Cx0x1) if the rast is not None, the target trajectory
             (position and yaw) along with their availability, the 2D matrix to center that agent,
@@ -132,12 +134,15 @@ None if not desired
         #         RuntimeWarning,
         #         stacklevel=2,
         #     )
-        data = self.sample_function(state_index, frames, self.dataset.agents, tl_faces, track_id)
+        data = self.sample_function(
+            state_index, frames, self.dataset.agents, tl_faces, selected_agent_id=total_agent_id,
+        )
+        # data = self.sample_function(state_index, frames, self.dataset.agents, tl_faces, track_id)
 
         # add information only, so that all data keys are always preserved
         # data["host_id"] = self.dataset.scenes[scene_index]["host"]
         data["timestamp"] = frames[state_index]["timestamp"]
-        data["track_id"] = np.int64(-1 if track_id is None else track_id)  # always a number to avoid crashing torch
+        # data["track_id"] = np.int64(-1 if track_id is None else track_id)  # always a number to avoid crashing torch
         # data["world_to_image"] = data["raster_from_world"]  # TODO deprecate
 
         # when rast is None, image could be None. In that case we remove the key
@@ -168,7 +173,7 @@ None if not desired
         #     state_index = index
         # else:
         #     state_index = index - self.cumulative_sizes[scene_index - 1]
-        return self.get_frame(scene_index, state_index)
+        return self.get_frame(scene_index, state_index, total_agent_id=-1)
 
     def get_scene_dataset(self, scene_index: int) -> "EgoDataset":
         """
