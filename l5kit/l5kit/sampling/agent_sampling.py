@@ -75,10 +75,15 @@ to train models that can recover from slight divergence from training set data
     history_frames = frames[history_slice].copy()  # copy() required if the object is a np.ndarray
     future_frames = frames[future_slice].copy()
 
-    sorted_frames = np.concatenate((history_frames[::-1], future_frames))  # from past to future
+    # sorted_frames = np.concatenate((history_frames[::-1], future_frames))  # from past to future
 
     # get agents (past and future)
-    agent_slice = get_agents_slice_from_frames(sorted_frames[0], sorted_frames[-1])
+    # agent_slice = get_agents_slice_from_frames(sorted_frames[0], sorted_frames[-1])
+    # agent_slice = get_agents_slice_from_frames(history_frames[-1], future_frames[-1])
+    agent_slice = slice(
+        history_frames[-1]["agent_index_interval"][0],
+        future_frames[-1]["agent_index_interval"][1]
+    )
     agents = agents[agent_slice].copy()  # this is the minimum slice of agents we need
     history_frames["agent_index_interval"] -= agent_slice.start  # sync interval with the agents array
     future_frames["agent_index_interval"] -= agent_slice.start  # sync interval with the agents array
@@ -95,35 +100,47 @@ to train models that can recover from slight divergence from training set data
             history_frames=history_frames, future_frames=future_frames
         )
 
-    # State you want to predict the future of.
-    cur_frame = history_frames[0]
-    cur_agents = history_agents[0]
+    # # State you want to predict the future of.
+    # cur_frame = history_frames[0]
+    # cur_agents = history_agents[0]
 
     if selected_track_id is None:
+        # For Ego
+        # State you want to predict the future of.
+        cur_frame = history_frames[0]
         agent_centroid_m = cur_frame["ego_translation"][:2]
         agent_yaw_rad = rotation33_as_yaw(cur_frame["ego_rotation"])
         agent_extent_m = np.asarray((EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, EGO_EXTENT_HEIGHT))
         selected_agent = None
     else:
+        # For the target Agent
+        # (simply recover the selected agent information in the agent dataset given track id)
+        # State you want to predict the future of.
+        # cur_agents = history_agents[0]
         # this will raise IndexError if the agent is not in the frame or under agent-threshold
         # this is a strict error, we cannot recover from this situation
-        try:
-            agent = filter_agents_by_track_id(
-                filter_agents_by_labels(cur_agents, filter_agents_threshold), selected_track_id
-            )[0]
-        except IndexError:
-            raise ValueError(f" track_id {selected_track_id} not in frame or below threshold")
-        agent_centroid_m = agent["centroid"]
-        agent_yaw_rad = float(agent["yaw"])
-        agent_extent_m = agent["extent"]
-        selected_agent = agent
+        selected_agent = filter_agents_by_track_id(
+            filter_agents_by_labels(history_agents[0], filter_agents_threshold), selected_track_id
+        )[0]
+        # try:
+        #     agent = filter_agents_by_track_id(
+        #         filter_agents_by_labels(cur_agents, filter_agents_threshold), selected_track_id
+        #     )[0]
+        # except IndexError:
+        #     raise ValueError(f" track_id {selected_track_id} not in frame or below threshold")
+        agent_centroid_m = selected_agent["centroid"]
+        agent_yaw_rad = float(selected_agent["yaw"])
+        agent_extent_m = selected_agent["extent"]
+        # selected_agent = agent
 
+    # Generate the image
     input_im = (
         None
         if not rasterizer
         else rasterizer.rasterize(history_frames, history_agents, history_tl_faces, selected_agent)
     )
 
+    # Compute other meta data
     world_from_agent = compute_agent_pose(agent_centroid_m, agent_yaw_rad)
     # agent_from_world = np.linalg.inv(world_from_agent)
     agent_from_world = inv_agent_pose(agent_centroid_m, agent_yaw_rad)

@@ -67,8 +67,11 @@ None if not desired
         self.dataset = zarr_dataset
         self.rasterizer = rasterizer
 
-        # map: scene_id -> frame_last_id+1
+        # scene ending frame_id+1
+        # map: scene_id -> end_frame_id+1
         self.cumulative_sizes = self.dataset.scenes["frame_index_interval"][:, 1]
+        # map: scene_id -> start_frame_id
+        self.scene_start_frame_id = self.dataset.scenes["frame_index_interval"][:, 0]
 
         render_context = RenderContext(
             raster_size_px=np.array(cfg["raster_params"]["raster_size"]),
@@ -147,10 +150,9 @@ None if not desired
 
     def __getitem__(self, index: int) -> dict:
         """
-        Function called by Torch to get an element
-
+        Note the ego dataset is indexed by frame
         Args:
-            index (int): index of the element to retrieve
+            index (int): frame_id
 
         Returns: please look get_frame signature and docstring
 
@@ -161,11 +163,11 @@ None if not desired
             index = len(self) + index
 
         scene_index = bisect.bisect_right(self.cumulative_sizes, index)
-
-        if scene_index == 0:
-            state_index = index
-        else:
-            state_index = index - self.cumulative_sizes[scene_index - 1]
+        state_index = index - self.scene_start_frame_id[scene_index]
+        # if scene_index == 0:
+        #     state_index = index
+        # else:
+        #     state_index = index - self.cumulative_sizes[scene_index - 1]
         return self.get_frame(scene_index, state_index)
 
     def get_scene_dataset(self, scene_index: int) -> "EgoDataset":

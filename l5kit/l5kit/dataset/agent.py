@@ -118,14 +118,15 @@ class AgentDataset(EgoDataset):
             index = len(self) + index
 
         total_agent_id = self.agents_indices[index]  # map from valid_agent_id to total_agent_id
-        track_id = self.valid_agent_id_to_track_id[index]
+        track_id = self.valid_agent_id_to_track_id[index]  # the car id
         frame_index = bisect.bisect_right(self.cumulative_sizes_agents, total_agent_id)
         scene_index = bisect.bisect_right(self.cumulative_sizes, frame_index)
 
-        if scene_index == 0:
-            state_index = frame_index
-        else:
-            state_index = frame_index - self.cumulative_sizes[scene_index - 1]
+        state_index = frame_index - self.scene_start_frame_id[scene_index]
+        # if scene_index == 0:
+        #     state_index = frame_index
+        # else:
+        #     state_index = frame_index - self.cumulative_sizes[scene_index - 1]
         return self.get_frame(scene_index, state_index, track_id=track_id)
 
     def get_scene_dataset(self, scene_index: int) -> "AgentDataset":
