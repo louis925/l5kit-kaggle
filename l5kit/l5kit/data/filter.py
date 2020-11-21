@@ -91,7 +91,8 @@ def filter_agents_by_track_id(agents: np.ndarray, track_id: int) -> np.ndarray:
     Returns:
         np.ndarray -- Selected agent.
     """
-    return agents[np.nonzero(agents["track_id"] == track_id)[0]]
+    # return agents[np.nonzero(agents["track_id"] == track_id)[0]]
+    return agents[agents["track_id"] == track_id]
 
 
 def filter_agents_by_frames(frames: np.ndarray, agents: np.ndarray) -> List[np.ndarray]:

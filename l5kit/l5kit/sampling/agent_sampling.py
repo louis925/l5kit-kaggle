@@ -9,7 +9,7 @@ from ..data import (
     get_tl_faces_slice_from_frames,
 )
 from ..data.filter import filter_agents_by_frames, filter_agents_by_track_id, is_valid_agent_by_labels
-from ..geometry import angular_distance, compute_agent_pose, inv_agent_pose, rotation33_as_yaw, transform_point
+from ..geometry import angular_distance, compute_agent_pose, inv_agent_pose, rotation33_as_yaw, transform_point, transform_points_fast
 from ..kinematic import Perturbation
 from ..rasterization import EGO_EXTENT_HEIGHT, EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, Rasterizer, RenderContext
 from .slicing import get_future_slice, get_history_slice
@@ -230,23 +230,57 @@ def _create_targets_for_deep_prediction(
     # How much the coordinates differ from the current state in meters.
     positions_m = np.zeros((num_frames, 2), dtype=np.float32)
     yaws_rad = np.zeros((num_frames, 1), dtype=np.float32)
-    availabilities = np.zeros((num_frames,), dtype=np.float32)
+    # availabilities = np.zeros((num_frames,), dtype=np.float32)
 
-    for i, (frame, frame_agents) in enumerate(zip(frames, agents)):
-        if selected_track_id is None:
+    # for i, (frame, frame_agents) in enumerate(zip(frames, agents)):
+    #     if selected_track_id is None:
+    #         agent_centroid_m = frame["ego_translation"][:2]
+    #         agent_yaw_rad = rotation33_as_yaw(frame["ego_rotation"])
+    #     else:
+    #         # it's not guaranteed the target will be in every frame
+    #         try:
+    #             agent = filter_agents_by_track_id(frame_agents, selected_track_id)[0]
+    #             agent_centroid_m = agent["centroid"]
+    #             agent_yaw_rad = agent["yaw"]
+    #         except IndexError:
+    #             availabilities[i] = 0.0  # keep track of invalid futures/history
+    #             continue
+
+    #     positions_m[i] = transform_point(agent_centroid_m, agent_from_world)
+    #     yaws_rad[i] = angular_distance(agent_yaw_rad, current_agent_yaw)
+    #     availabilities[i] = 1.0
+
+    if len(frames) == 0:
+        return positions_m, yaws_rad, np.zeros((num_frames,), dtype=np.float32)
+
+    if selected_track_id is None:
+        # For Ego
+        availabilities = np.zeros((num_frames,), dtype=np.float32)
+        for i, frame in enumerate(frames):
             agent_centroid_m = frame["ego_translation"][:2]
             agent_yaw_rad = rotation33_as_yaw(frame["ego_rotation"])
-        else:
-            # it's not guaranteed the target will be in every frame
-            try:
-                agent = filter_agents_by_track_id(frame_agents, selected_track_id)[0]
-                agent_centroid_m = agent["centroid"]
-                agent_yaw_rad = agent["yaw"]
-            except IndexError:
-                availabilities[i] = 0.0  # keep track of invalid futures/history
-                continue
 
-        positions_m[i] = transform_point(agent_centroid_m, agent_from_world)
-        yaws_rad[i] = angular_distance(agent_yaw_rad, current_agent_yaw)
-        availabilities[i] = 1.0
+            positions_m[i] = transform_point(agent_centroid_m, agent_from_world)
+            yaws_rad[i] = angular_distance(agent_yaw_rad, current_agent_yaw)
+            availabilities[i] = 1.0
+        return positions_m, yaws_rad, availabilities
+
+    # For Agent
+    agents = [
+        frame_agents[frame_agents['track_id'] == selected_track_id]
+        for frame_agents in agents
+    ]
+    availabilities = np.zeros((num_frames,), dtype=np.bool)
+    availabilities[:len(agents)] = [len(a) > 0 for a in agents]
+    agents_av = [a for a, av in zip(agents, availabilities) if av]  # note len(agents) >= len(availabilities)
+    if len(agents_av) > 0:
+        agents_av = np.concatenate(agents_av)
+        positions_m[availabilities] = agents_av['centroid']
+        yaws_rad[availabilities] = agents_av['yaw'].reshape(-1, 1)
+        positions_m = transform_points_fast(positions_m, agent_from_world)
+        yaws_rad = angular_distance(yaws_rad, current_agent_yaw)
+        positions_m[~availabilities] = 0
+        yaws_rad[~availabilities] = 0
+    availabilities = availabilities.astype(np.float32)
+
     return positions_m, yaws_rad, availabilities

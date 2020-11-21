@@ -110,6 +110,22 @@ def transform_points(points: np.ndarray, transf_matrix: np.ndarray) -> np.ndarra
     return (points @ transf_matrix.T[:-1, :-1]) + transf_matrix[:-1, -1]
 
 
+def transform_points_fast(points: np.ndarray, transf_matrix: np.ndarray) -> np.ndarray:
+    """Transform points using transformation matrix.
+    Note this function assumes points.shape[1] == matrix.shape[1] - 1, which means that the last
+    row in the matrix does not influence the final result.
+    For 2D points only the first 2x3 part of the matrix will be used.
+
+    Args:
+        points (np.ndarray): Input points (Nx2) or (Nx3).
+        transf_matrix (np.ndarray): 3x3 or 4x4 transformation matrix for 2D and 3D input respectively
+
+    Returns:
+        np.ndarray: array of shape (N,2) for 2D input points, or (N,3) points for 3D input points
+    """
+    return (points @ transf_matrix.T[:-1, :-1]) + transf_matrix[:-1, -1]
+
+
 def transform_point(point: np.ndarray, transf_matrix: np.ndarray) -> np.ndarray:
     """Transform a single vector using transformation matrix.
 
