@@ -228,7 +228,7 @@ def _create_targets_for_deep_prediction(
 
     """
     # How much the coordinates differ from the current state in meters.
-    positions_m = np.zeros((num_frames, 2), dtype=np.float32)
+    positions_m = np.zeros((num_frames, 2), dtype=np.float64)  # np.float32
     yaws_rad = np.zeros((num_frames, 1), dtype=np.float32)
     # availabilities = np.zeros((num_frames,), dtype=np.float32)
 
@@ -283,4 +283,4 @@ def _create_targets_for_deep_prediction(
         yaws_rad[~availabilities] = 0
     availabilities = availabilities.astype(np.float32)
 
-    return positions_m, yaws_rad, availabilities
+    return positions_m.astype(np.float32), yaws_rad, availabilities
