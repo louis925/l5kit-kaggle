@@ -79,6 +79,12 @@ None if not desired
             center_in_raster_ratio=np.array(cfg["raster_params"]["ego_center"]),
         )
 
+        velocity_corrected_yaw = (
+            cfg['model_params']['velocity_corrected_yaw'] 
+            if 'velocity_corrected_yaw' in cfg['model_params']
+            else False
+        )
+
         # build a partial so we don't have to access cfg each time
         self.sample_function = partial(
             generate_agent_sample,
@@ -92,6 +98,7 @@ None if not desired
             filter_agents_threshold=cfg["raster_params"]["filter_agents_threshold"],
             rasterizer=rasterizer,
             perturbation=perturbation,
+            velocity_corrected_yaw=velocity_corrected_yaw,
         )
 
     def __len__(self) -> int:
