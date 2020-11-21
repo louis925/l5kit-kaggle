@@ -36,6 +36,15 @@ def inv_agent_pose(agent_centroid_m: np.ndarray, agent_yaw_rad: float) -> np.nda
     ])
 
 
+def rotate_agent_from_world(agent_yaw_rad: float) -> np.ndarray:
+    s = np.sin(agent_yaw_rad)
+    c = np.cos(agent_yaw_rad)
+    return np.array([
+        [c, s],
+        [-s, c],
+    ])
+
+
 def rotation33_as_yaw(rotation: np.ndarray) -> float:
     """Compute the yaw component of given 3x3 rotation matrix.
 
@@ -124,6 +133,19 @@ def transform_points_fast(points: np.ndarray, transf_matrix: np.ndarray) -> np.n
         np.ndarray: array of shape (N,2) for 2D input points, or (N,3) points for 3D input points
     """
     return (points @ transf_matrix.T[:-1, :-1]) + transf_matrix[:-1, -1]
+
+
+def transform_world_to_agent(points: np.ndarray, shift: np.ndarray, rotation_matrix: np.ndarray) -> np.ndarray:
+    """Transform points by subtracting shift then apply rotation_matrix
+
+    Args:
+        points (np.ndarray): Input points (Nx2).
+        rotation_matrix (np.ndarray): 2x2 rotation matrix.
+
+    Returns:
+        np.ndarray: coordinate array of shape (N, 2) in agent space
+    """
+    return (points - shift) @ rotation_matrix.T
 
 
 def transform_point(point: np.ndarray, transf_matrix: np.ndarray) -> np.ndarray:

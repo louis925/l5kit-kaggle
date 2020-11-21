@@ -9,7 +9,16 @@ from ..data import (
     get_tl_faces_slice_from_frames,
 )
 from ..data.filter import filter_agents_by_frames, filter_agents_by_track_id, is_valid_agent_by_labels
-from ..geometry import angular_distance, compute_agent_pose, inv_agent_pose, rotation33_as_yaw, transform_point, transform_points_fast
+from ..geometry import (
+    angular_distance,
+    compute_agent_pose,
+    inv_agent_pose,
+    rotate_agent_from_world,
+    rotation33_as_yaw,
+    transform_point,
+    transform_points_fast,
+    transform_world_to_agent,
+)
 from ..kinematic import Perturbation
 from ..rasterization import EGO_EXTENT_HEIGHT, EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, Rasterizer, RenderContext
 from .slicing import get_future_slice, get_history_slice
@@ -153,15 +162,18 @@ to train models that can recover from slight divergence from training set data
     world_from_agent = compute_agent_pose(agent_centroid_m, agent_yaw_rad)
     # agent_from_world = np.linalg.inv(world_from_agent)
     agent_from_world = inv_agent_pose(agent_centroid_m, agent_yaw_rad)
+    rotation_agent_from_world = rotate_agent_from_world(agent_yaw_rad)
     raster_from_world = render_context.raster_from_world(agent_centroid_m, agent_yaw_rad)
 
     future_positions_m, future_yaws_rad, future_availabilities = _create_targets_for_deep_prediction(
-        future_num_frames, future_frames, selected_track_id, future_agents, agent_from_world, agent_yaw_rad,
+        future_num_frames, future_frames, selected_track_id, future_agents, rotation_agent_from_world, agent_yaw_rad,
+        agent_centroid_m,
     )
 
     # history_num_frames + 1 because it also includes the current frame
     history_positions_m, history_yaws_rad, history_availabilities = _create_targets_for_deep_prediction(
-        history_num_frames + 1, history_frames, selected_track_id, history_agents, agent_from_world, agent_yaw_rad,
+        history_num_frames + 1, history_frames, selected_track_id, history_agents, rotation_agent_from_world, agent_yaw_rad,
+        agent_centroid_m,
     )
 
     # compute estimated velocities by finite differentiatin on future positions
@@ -207,8 +219,10 @@ def _create_targets_for_deep_prediction(
     frames: np.ndarray,
     selected_track_id: Optional[int],
     agents: List[np.ndarray],
-    agent_from_world: np.ndarray,
+    # agent_from_world: np.ndarray,
+    rotation_agent_from_world: np.ndarray,
     current_agent_yaw: float,
+    current_agent_centroid: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Internal function that creates the targets and availability masks for deep prediction-type models.
@@ -228,7 +242,7 @@ def _create_targets_for_deep_prediction(
 
     """
     # How much the coordinates differ from the current state in meters.
-    positions_m = np.zeros((num_frames, 2), dtype=np.float64)  # np.float32
+    # positions_m = np.zeros((num_frames, 2), dtype=np.float32)
     yaws_rad = np.zeros((num_frames, 1), dtype=np.float32)
     # availabilities = np.zeros((num_frames,), dtype=np.float32)
 
@@ -251,16 +265,18 @@ def _create_targets_for_deep_prediction(
     #     availabilities[i] = 1.0
 
     if len(frames) == 0:
-        return positions_m, yaws_rad, np.zeros((num_frames,), dtype=np.float32)
+        return np.zeros((num_frames, 2), dtype=np.float32), yaws_rad, np.zeros((num_frames,), dtype=np.float32)
 
     if selected_track_id is None:
         # For Ego
+        positions_m = np.zeros((num_frames, 2), dtype=np.float32)
         availabilities = np.zeros((num_frames,), dtype=np.float32)
         for i, frame in enumerate(frames):
             agent_centroid_m = frame["ego_translation"][:2]
             agent_yaw_rad = rotation33_as_yaw(frame["ego_rotation"])
 
-            positions_m[i] = transform_point(agent_centroid_m, agent_from_world)
+            # positions_m[i] = transform_point(agent_centroid_m, agent_from_world)
+            positions_m[i] = transform_world_to_agent(agent_centroid_m, current_agent_centroid, rotation_agent_from_world)
             yaws_rad[i] = angular_distance(agent_yaw_rad, current_agent_yaw)
             availabilities[i] = 1.0
         return positions_m, yaws_rad, availabilities
@@ -270,6 +286,7 @@ def _create_targets_for_deep_prediction(
         frame_agents[frame_agents['track_id'] == selected_track_id]
         for frame_agents in agents
     ]
+    positions_m = np.zeros((num_frames, 2), dtype=np.float64)
     availabilities = np.zeros((num_frames,), dtype=np.bool)
     availabilities[:len(agents)] = [len(a) > 0 for a in agents]
     agents_av = [a for a, av in zip(agents, availabilities) if av]  # note len(agents) >= len(availabilities)
@@ -277,7 +294,7 @@ def _create_targets_for_deep_prediction(
         agents_av = np.concatenate(agents_av)
         positions_m[availabilities] = agents_av['centroid']
         yaws_rad[availabilities] = agents_av['yaw'].reshape(-1, 1)
-        positions_m = transform_points_fast(positions_m, agent_from_world)
+        positions_m = transform_world_to_agent(positions_m, current_agent_centroid, rotation_agent_from_world)
         yaws_rad = angular_distance(yaws_rad, current_agent_yaw)
         positions_m[~availabilities] = 0
         yaws_rad[~availabilities] = 0
