@@ -68,8 +68,8 @@ def draw_boxes(
     #     r_m = yaw_as_rotation33(agent["yaw"])
     #     box_world_coords[idx] = transform_points(corners, r_m) + agent["centroid"][:2]
     # shape: (N agents)x(4 corners)x(2D coords)
-    # corners_m = _corners_base_coords * np.maximum(agents["extent"], _MIN_EXTENT)[:, None, :2]  # corners in zero
-    corners_m = _corners_base_coords * agents["extent"][:, None, :2]  # corners in zero
+    corners_m = _corners_base_coords * np.maximum(agents["extent"], _MIN_EXTENT)[:, None, :2]  # corners in zero
+    # corners_m = _corners_base_coords * agents["extent"][:, None, :2]  # corners in zero
     s = np.sin(agents['yaw'])
     c = np.cos(agents['yaw'])
     rotation_m = np.moveaxis(np.array([[c, -s], [s, c]]), 2, 0)
