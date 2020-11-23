@@ -156,7 +156,7 @@ to train models that can recover from slight divergence from training set data
             agent_yaw_rad = _estimate_target_yaw(
                 history_agents, selected_track_id, history_step_time, agent_yaw_rad,
             )
-            selected_agent["yaw"] = agent_yaw_rad  # for rasterizer
+            selected_agent["yaw"] = agent_yaw_rad  # for rasterizer, this also affect agents list
 
     # Generate the image (most computation intense part)
     input_im = (
@@ -334,5 +334,6 @@ def _estimate_target_yaw(
     speed_threshold = speed_square > 1.0  # filter out speed^2 < (1.0m/s)^2 cases
     if not speed_threshold:
         return agent_yaw_rad
-    return np.angle(weighted_avg_velocities[0]+weighted_avg_velocities[1]*(1.0j))
-    
+    est_yaw = float(np.angle(weighted_avg_velocities[0] + weighted_avg_velocities[1] * (1.0j)))
+    # limit to the correction to maximum of 5 degree ~= 0.1 radian (about 1m in y per 10m in x)
+    return est_yaw if abs(est_yaw - agent_yaw_rad) <= 0.1 else agent_yaw_rad
