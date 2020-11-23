@@ -73,12 +73,39 @@ def draw_boxes(
     s = np.sin(agents['yaw'])
     c = np.cos(agents['yaw'])
     rotation_m = np.moveaxis(np.array([[c, -s], [s, c]]), 2, 0)
-    box_world_coords = np.einsum('bti,bji->btj', corners_m, rotation_m) + agents['centroid'][:, :2]
+    box_world_coords = np.einsum('bti,bji->btj', corners_m, rotation_m) + agents['centroid'][:, None, :2]
     box_raster_coords = transform_points_fast(box_world_coords.reshape((-1, 2)), raster_from_world)
 
     # fillPoly wants polys in a sequence with points inside as (x,y)
     box_raster_coords = cv2_subpixel(box_raster_coords.reshape((-1, 4, 2)))
     cv2.fillPoly(im, box_raster_coords, color=color, lineType=cv2.LINE_AA, shift=CV2_SHIFT)
+    return im
+
+
+# (frame) * (1 for 2D coord later) assume 50 frams and 0.1s per frame
+_extrapolate_time_base = np.arange(1, 51)[:, None] * 0.1
+
+
+def draw_agent_velocity(
+    im: np.ndarray,
+    raster_size: Tuple[int, int],
+    raster_from_world: np.ndarray,
+    agent: np.ndarray,
+):
+    velocity = agent['velocity']
+    extrapolate_positions = (
+        velocity[None, :] * _extrapolate_time_base + agent['centroid'][:2][None, :]
+    )
+    raster_coords = transform_points_fast(extrapolate_positions, raster_from_world)
+    raster_coords = np.round(raster_coords).astype('int32')
+    mask = (
+        (0 <= raster_coords[:, 0]) & (raster_coords[:, 0] < raster_size[0]) &
+        (0 <= raster_coords[:, 1]) & (raster_coords[:, 1] < raster_size[1])
+    )
+    raster_coords = raster_coords[mask]
+    # plot onto the image
+    # Note the first dimension in the image is y, then x
+    im[tuple(raster_coords[:, ::-1].T)] = 250  # any color other than 255 for distinction
     return im
 
 
@@ -106,7 +133,7 @@ class BoxRasterizer(Rasterizer):
         history_tl_faces: List[np.ndarray],
         agent: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        # all frames are drawn relative to this one"
+        # all frames are drawn relative to this one
         frame = history_frames[0]
         if agent is None:
             ego_translation_m = history_frames[0]["ego_translation"]
@@ -142,6 +169,12 @@ class BoxRasterizer(Rasterizer):
 
             agents_images[..., i] = agents_image
             ego_images[..., i] = ego_image
+
+        if agent is not None:
+            # add extrapolation dots from velocity to the image at 0
+            ego_images[..., 0] = draw_agent_velocity(
+                ego_images[..., 0], self.raster_size, raster_from_world, agent
+            )
 
         # combine such that the image consists of [agent_t, agent_t-1, agent_t-2, ego_t, ego_t-1, ego_t-2]
         out_im = np.concatenate((agents_images, ego_images), -1)

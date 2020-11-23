@@ -153,10 +153,12 @@ to train models that can recover from slight divergence from training set data
         # selected_agent = agent
 
         if velocity_corrected_yaw:
-            agent_yaw_rad = _estimate_target_yaw(
+            # agent_yaw_rad = _estimate_target_yaw(
+            agent_yaw_rad, agent_velocity = _estimate_target_yaw_and_velocity(
                 history_agents, selected_track_id, history_step_time, agent_yaw_rad,
             )
             selected_agent["yaw"] = agent_yaw_rad  # for rasterizer, this also affect agents list
+            selected_agent['velocity'] = agent_velocity  # not sure why this is not being used
 
     # Generate the image (most computation intense part)
     input_im = (
@@ -337,3 +339,36 @@ def _estimate_target_yaw(
     est_yaw = float(np.angle(weighted_avg_velocities[0] + weighted_avg_velocities[1] * (1.0j)))
     # limit to the correction to maximum of 5 degree ~= 0.1 radian (about 1m in y per 10m in x)
     return est_yaw if abs(est_yaw - agent_yaw_rad) <= 0.1 else agent_yaw_rad
+
+
+def _estimate_target_yaw_and_velocity(
+    history_agents, selected_track_id: int, history_step_time: float,
+    agent_yaw_rad: float,
+):
+    selected_agents = [
+        frame_agents[frame_agents['track_id'] == selected_track_id]
+        for frame_agents in history_agents
+    ]
+    # availabilities = np.array([len(a) > 0 for a in selected_agents], dtype=np.bool)
+    world_coords = np.array([a[0]['centroid'] for a in selected_agents if len(a) > 0])
+    if len(world_coords) <= 1:
+        return agent_yaw_rad, np.zeros(2)
+    # assume 0.1 s/frame
+    rel_world_coords = world_coords - world_coords[0]
+    avg_velocities = (
+        -rel_world_coords[1:] / history_step_time / np.arange(1, len(rel_world_coords))[:, None]
+    )
+    # weighted_avg_velocities
+    weighted_avg_velocities = avg_velocities.mean(axis=0)
+    # speed threshold
+    speed_square = (weighted_avg_velocities**2).sum()
+    speed_threshold = speed_square > 1.0  # filter out speed^2 < (1.0m/s)^2 cases
+    if not speed_threshold:
+        return agent_yaw_rad, np.zeros(2)
+    est_yaw = float(np.angle(weighted_avg_velocities[0] + weighted_avg_velocities[1] * (1.0j)))
+    # limit to the correction to maximum of 5 degree ~= 0.1 radian (about 1m in y per 10m in x)
+    return (
+        est_yaw if abs(est_yaw - agent_yaw_rad) <= 0.1 else agent_yaw_rad,
+        weighted_avg_velocities
+    )
+
