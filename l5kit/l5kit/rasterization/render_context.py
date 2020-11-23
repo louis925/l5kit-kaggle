@@ -66,8 +66,9 @@ class RenderContext:
         ])
 
         # pose_from_world = np.linalg.inv(pose_in_world)
-        raster_from_world = self.raster_from_local @ pose_from_world
-        return raster_from_world
+        # raster_from_world = self.raster_from_local @ pose_from_world
+        # return raster_from_world
+        return self.raster_from_local @ pose_from_world
 
     def world_from_raster(self, position_m: np.ndarray, angle_rad: float) -> np.ndarray:
         """

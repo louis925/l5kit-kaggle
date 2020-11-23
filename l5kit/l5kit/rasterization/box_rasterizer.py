@@ -6,7 +6,7 @@ import numpy as np
 from l5kit.data.zarr_dataset import AGENT_DTYPE
 
 from ..data.filter import filter_agents_by_labels, filter_agents_by_track_id
-from ..geometry import rotation33_as_yaw, transform_points
+from ..geometry import rotation33_as_yaw, transform_points, transform_points_fast
 from ..geometry.transform import yaw_as_rotation33
 from .rasterizer import EGO_EXTENT_HEIGHT, EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, Rasterizer
 from .render_context import RenderContext
@@ -28,6 +28,10 @@ def get_ego_as_agent(frame: np.ndarray) -> np.ndarray:  # TODO this can be usefu
     ego_agent[0]["yaw"] = rotation33_as_yaw(frame["ego_rotation"])
     ego_agent[0]["extent"] = np.asarray((EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, EGO_EXTENT_HEIGHT))
     return ego_agent
+
+
+_corners_base_coords = (np.asarray([[-1, -1], [-1, 1], [1, 1], [1, -1]]) / 2)[None, :, :]
+_MIN_EXTENT = 0.5
 
 
 def draw_boxes(
@@ -55,16 +59,22 @@ def draw_boxes(
     else:
         im = np.zeros((raster_size[1], raster_size[0], 3), dtype=np.uint8)
 
-    box_world_coords = np.zeros((len(agents), 4, 2))
-    corners_base_coords = np.asarray([[-1, -1], [-1, 1], [1, 1], [1, -1]])
+    # box_world_coords = np.zeros((len(agents), 4, 2))
+    # corners_base_coords = np.asarray([[-1, -1], [-1, 1], [1, 1], [1, -1]])
 
     # compute the corner in world-space (start in origin, rotate and then translate)
-    for idx, agent in enumerate(agents):
-        corners = corners_base_coords * agent["extent"][:2] / 2  # corners in zero
-        r_m = yaw_as_rotation33(agent["yaw"])
-        box_world_coords[idx] = transform_points(corners, r_m) + agent["centroid"][:2]
-
-    box_raster_coords = transform_points(box_world_coords.reshape((-1, 2)), raster_from_world)
+    # for idx, agent in enumerate(agents):
+    #     corners = corners_base_coords * agent["extent"][:2] / 2  # corners in zero
+    #     r_m = yaw_as_rotation33(agent["yaw"])
+    #     box_world_coords[idx] = transform_points(corners, r_m) + agent["centroid"][:2]
+    # shape: (N agents)x(4 corners)x(2D coords)
+    # corners_m = _corners_base_coords * np.maximum(agents["extent"], _MIN_EXTENT)[:, None, :2]  # corners in zero
+    corners_m = _corners_base_coords * agents["extent"][:, None, :2]  # corners in zero
+    s = np.sin(agents['yaw'])
+    c = np.cos(agents['yaw'])
+    rotation_m = np.moveaxis(np.array([[c, -s], [s, c]]), 2, 0)
+    box_world_coords = np.einsum('bti,bji->btj', corners_m, rotation_m) + agents['centroid'][:, :2]
+    box_raster_coords = transform_points_fast(box_world_coords.reshape((-1, 2)), raster_from_world)
 
     # fillPoly wants polys in a sequence with points inside as (x,y)
     box_raster_coords = cv2_subpixel(box_raster_coords.reshape((-1, 4, 2)))
