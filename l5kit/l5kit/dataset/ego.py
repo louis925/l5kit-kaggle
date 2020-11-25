@@ -153,9 +153,10 @@ None if not desired
         # data["world_to_image"] = data["raster_from_world"]  # TODO deprecate
 
         # when rast is None, image could be None. In that case we remove the key
-        if data["image"] is not None:
-            data["image"] = data["image"].transpose(2, 0, 1)  # 0,1,C -> C,0,1
-        else:
+        # if data["image"] is not None:
+        #     data["image"] = data["image"].transpose(2, 0, 1)  # 0,1,C -> C,0,1
+        # else:
+        if data["image"] is None:
             del data["image"]
 
         return data
