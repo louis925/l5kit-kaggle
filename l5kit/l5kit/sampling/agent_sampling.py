@@ -152,13 +152,13 @@ to train models that can recover from slight divergence from training set data
         agent_extent_m = selected_agent["extent"]
         # selected_agent = agent
 
+        agent_yaw_rad, agent_velocity = _estimate_target_yaw_and_velocity(
+            history_agents, selected_track_id, history_step_time, agent_yaw_rad,
+        )
+        selected_agent['velocity'] = agent_velocity  # not sure why this is not being used
         if velocity_corrected_yaw:
             # agent_yaw_rad = _estimate_target_yaw(
-            agent_yaw_rad, agent_velocity = _estimate_target_yaw_and_velocity(
-                history_agents, selected_track_id, history_step_time, agent_yaw_rad,
-            )
             selected_agent["yaw"] = agent_yaw_rad  # for rasterizer, this also affect agents list
-            selected_agent['velocity'] = agent_velocity  # not sure why this is not being used
 
     # Generate the image (most computation intense part)
     input_im = (
