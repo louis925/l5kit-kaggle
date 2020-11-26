@@ -169,11 +169,11 @@ class BoxRasterizer(Rasterizer):
             agents_images[i] = agents_image
             ego_images[i] = ego_image
 
-        if agent is not None:
-            # add extrapolation dots from velocity to the image at 0
-            ego_images[0] = draw_agent_velocity(
-                ego_images[0], self.raster_size, raster_from_world, agent
-            )
+        # if agent is not None:
+        #     # add extrapolation dots from velocity to the image at 0
+        #     ego_images[0] = draw_agent_velocity(
+        #         ego_images[0], self.raster_size, raster_from_world, agent
+        #     )
 
         # combine such that the image consists of [agent_t, agent_t-1, agent_t-2, ego_t, ego_t-1, ego_t-2]
         out_im = np.concatenate((agents_images, ego_images), 0)
