@@ -24,7 +24,7 @@ def get_history_slice(
     """
     if history_step_size <= 0:
         raise IndexError("History step size can not be 0 or negative")
-    history_earliest_index = frame_index - (history_num_states) * history_step_size - 1
+    history_earliest_index = frame_index - history_num_states * history_step_size - 1
     history_latest_index = frame_index - (0 if include_current_state else history_step_size)
 
     if history_latest_index < 0:
@@ -64,6 +64,6 @@ def get_future_slice(frame_index: int, future_num_states: int, future_step_size:
     if future_step_size <= 0:
         raise IndexError("Future step size can not be 0")
 
-    future_latest_index = frame_index + (future_num_states) * future_step_size + 1
+    future_latest_index = frame_index + future_num_states * future_step_size + 1
     future_earliest_index = frame_index + future_step_size
     return slice(future_earliest_index, future_latest_index, future_step_size)

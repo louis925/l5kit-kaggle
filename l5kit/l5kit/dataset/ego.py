@@ -67,12 +67,22 @@ None if not desired
         self.dataset = zarr_dataset
         self.rasterizer = rasterizer
 
+        # scene ending frame_id+1
+        # map: scene_id -> end_frame_id+1
         self.cumulative_sizes = self.dataset.scenes["frame_index_interval"][:, 1]
+        # map: scene_id -> start_frame_id
+        self.scene_start_frame_id = self.dataset.scenes["frame_index_interval"][:, 0]
 
         render_context = RenderContext(
             raster_size_px=np.array(cfg["raster_params"]["raster_size"]),
             pixel_size_m=np.array(cfg["raster_params"]["pixel_size"]),
             center_in_raster_ratio=np.array(cfg["raster_params"]["ego_center"]),
+        )
+
+        velocity_corrected_yaw = (
+            cfg['model_params']['velocity_corrected_yaw'] 
+            if 'velocity_corrected_yaw' in cfg['model_params']
+            else False
         )
 
         # build a partial so we don't have to access cfg each time
@@ -88,6 +98,7 @@ None if not desired
             filter_agents_threshold=cfg["raster_params"]["filter_agents_threshold"],
             rasterizer=rasterizer,
             perturbation=perturbation,
+            velocity_corrected_yaw=velocity_corrected_yaw,
         )
 
     def __len__(self) -> int:
@@ -99,21 +110,26 @@ None if not desired
         """
         return len(self.dataset.frames)
 
-    def get_frame(self, scene_index: int, state_index: int, track_id: Optional[int] = None) -> dict:
+    # def get_frame(self, scene_index: int, state_index: int, track_id: Optional[int] = None) -> dict:
+    def get_frame(self, scene_index: int, state_index: int, total_agent_id: int) -> dict:
         """
         A utility function to get the rasterisation and trajectory target for a given agent in a given frame
 
         Args:
             scene_index (int): the index of the scene in the zarr
             state_index (int): a relative frame index in the scene
-            track_id (Optional[int]): the agent to rasterize or None for the AV
+            # track_id (Optional[int]): the agent to rasterize or None for the AV
+            total_agent_id (int): the total_agent_id of the agent to rasterize or -1 for the AV
         Returns:
             dict: the rasterised image in (Cx0x1) if the rast is not None, the target trajectory
             (position and yaw) along with their availability, the 2D matrix to center that agent,
             the agent track (-1 if ego) and the timestamp
 
         """
-        frames = self.dataset.frames[get_frames_slice_from_scenes(self.dataset.scenes[scene_index])]
+        frames = self.dataset.frames[
+            slice(*self.dataset.scenes[scene_index]["frame_index_interval"])
+        ]
+        # frames = self.dataset.frames[get_frames_slice_from_scenes(self.dataset.scenes[scene_index])]
 
         tl_faces = self.dataset.tl_faces
         # try:
@@ -125,28 +141,31 @@ None if not desired
         #         RuntimeWarning,
         #         stacklevel=2,
         #     )
-        data = self.sample_function(state_index, frames, self.dataset.agents, tl_faces, track_id)
+        data = self.sample_function(
+            state_index, frames, self.dataset.agents, tl_faces, selected_agent_id=total_agent_id,
+        )
+        # data = self.sample_function(state_index, frames, self.dataset.agents, tl_faces, track_id)
 
         # add information only, so that all data keys are always preserved
         # data["host_id"] = self.dataset.scenes[scene_index]["host"]
         data["timestamp"] = frames[state_index]["timestamp"]
-        data["track_id"] = np.int64(-1 if track_id is None else track_id)  # always a number to avoid crashing torch
+        # data["track_id"] = np.int64(-1 if track_id is None else track_id)  # always a number to avoid crashing torch
         # data["world_to_image"] = data["raster_from_world"]  # TODO deprecate
 
         # when rast is None, image could be None. In that case we remove the key
-        if data["image"] is not None:
-            data["image"] = data["image"].transpose(2, 0, 1)  # 0,1,C -> C,0,1
-        else:
+        # if data["image"] is not None:
+        #     data["image"] = data["image"].transpose(2, 0, 1)  # 0,1,C -> C,0,1
+        # else:
+        if data["image"] is None:
             del data["image"]
 
         return data
 
     def __getitem__(self, index: int) -> dict:
         """
-        Function called by Torch to get an element
-
+        Note the ego dataset is indexed by frame
         Args:
-            index (int): index of the element to retrieve
+            index (int): frame_id
 
         Returns: please look get_frame signature and docstring
 
@@ -157,12 +176,12 @@ None if not desired
             index = len(self) + index
 
         scene_index = bisect.bisect_right(self.cumulative_sizes, index)
-
-        if scene_index == 0:
-            state_index = index
-        else:
-            state_index = index - self.cumulative_sizes[scene_index - 1]
-        return self.get_frame(scene_index, state_index)
+        state_index = index - self.scene_start_frame_id[scene_index]
+        # if scene_index == 0:
+        #     state_index = index
+        # else:
+        #     state_index = index - self.cumulative_sizes[scene_index - 1]
+        return self.get_frame(scene_index, state_index, total_agent_id=-1)
 
     def get_scene_dataset(self, scene_index: int) -> "EgoDataset":
         """

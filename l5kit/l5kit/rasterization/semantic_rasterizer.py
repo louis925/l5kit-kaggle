@@ -205,7 +205,7 @@ class SemanticRasterizer(Rasterizer):
 
         cv2.polylines(img, crosswalks, True, (255, 117, 69), lineType=cv2.LINE_AA, shift=CV2_SHIFT)
 
-        return img
+        return img.transpose(2, 0, 1)
 
     def to_rgb(self, in_im: np.ndarray, **kwargs: dict) -> np.ndarray:
         return (in_im * 255).astype(np.uint8)

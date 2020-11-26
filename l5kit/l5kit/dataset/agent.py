@@ -32,10 +32,11 @@ class AgentDataset(EgoDataset):
 
         super(AgentDataset, self).__init__(cfg, zarr_dataset, rasterizer, perturbation)
         if agents_mask is None:  # if not provided try to load it from the zarr
-            agents_mask = self.load_agents_mask()
+            agents_mask = self.load_agents_mask()  # N_total_agents x 2 int array. (N history frames, N future frames) of an agent under a filter threshold (default 0.5)
             past_mask = agents_mask[:, 0] >= min_frame_history
             future_mask = agents_mask[:, 1] >= min_frame_future
-            agents_mask = past_mask * future_mask
+            # bool array (N_total_agents,)
+            agents_mask = past_mask & future_mask
 
             if min_frame_history != MIN_FRAME_HISTORY:
                 warnings.warn(
@@ -51,16 +52,22 @@ class AgentDataset(EgoDataset):
             warnings.warn("you're running with a custom agents_mask", RuntimeWarning, stacklevel=2)
 
         # store the valid agents indices (N_valid_agents,)
+        # map: valid_agent_id -> total_agent_id
         self.agents_indices = np.nonzero(agents_mask)[0]
 
         # store an array where valid indices have increasing numbers and the rest is -1 (N_total_agents,)
+        # map: total_agent_id -> valid_agent_id
         self.mask_indices = agents_mask.copy().astype(np.int)
         self.mask_indices[self.mask_indices == 0] = -1
         self.mask_indices[self.mask_indices == 1] = np.arange(0, np.sum(agents_mask))
 
         # this will be used to get the frame idx from the agent idx
+        # map: frame_id -> total_agent_id+1
         self.cumulative_sizes_agents = self.dataset.frames["agent_index_interval"][:, 1]
         self.agents_mask = agents_mask
+
+        # map: valid_agent_id -> track_id
+        # self.valid_agent_id_to_track_id = self.dataset.agents['track_id'][self.agents_indices]
 
     def load_agents_mask(self) -> np.ndarray:
         """
@@ -103,22 +110,25 @@ class AgentDataset(EgoDataset):
     def __getitem__(self, index: int) -> dict:
         """
         Differs from parent by iterating on agents and not AV.
+        index: valide_agent_id
         """
         if index < 0:
             if -index > len(self):
                 raise ValueError("absolute value of index should not exceed dataset length")
             index = len(self) + index
 
-        index = self.agents_indices[index]
-        track_id = self.dataset.agents[index]["track_id"]
-        frame_index = bisect.bisect_right(self.cumulative_sizes_agents, index)
+        total_agent_id = self.agents_indices[index]  # map from valid_agent_id to total_agent_id
+        # track_id = self.valid_agent_id_to_track_id[index]  # the car id
+        frame_index = bisect.bisect_right(self.cumulative_sizes_agents, total_agent_id)
         scene_index = bisect.bisect_right(self.cumulative_sizes, frame_index)
 
-        if scene_index == 0:
-            state_index = frame_index
-        else:
-            state_index = frame_index - self.cumulative_sizes[scene_index - 1]
-        return self.get_frame(scene_index, state_index, track_id=track_id)
+        state_index = frame_index - self.scene_start_frame_id[scene_index]
+        # if scene_index == 0:
+        #     state_index = frame_index
+        # else:
+        #     state_index = frame_index - self.cumulative_sizes[scene_index - 1]
+        # return self.get_frame(scene_index, state_index, track_id=track_id)
+        return self.get_frame(scene_index, state_index, total_agent_id=total_agent_id)
 
     def get_scene_dataset(self, scene_index: int) -> "AgentDataset":
         """

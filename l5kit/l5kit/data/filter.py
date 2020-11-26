@@ -53,8 +53,32 @@ def filter_agents_by_labels(agents: np.ndarray, threshold: float = 0.5) -> np.nd
     Returns:
         np.ndarray -- A subset of input ``agents`` array.
     """
-    label_indices = _get_label_filter(agents["label_probabilities"], threshold)
-    return agents[label_indices]
+    # label_indices = _get_label_filter(agents["label_probabilities"], threshold)
+    # return agents[label_indices]
+    return agents[
+        np.sum(agents["label_probabilities"][:, PERCEPTION_LABEL_INDICES_TO_KEEP],
+               axis=1) > threshold
+    ]
+
+
+def is_valid_agent_by_labels(agent: np.ndarray, threshold: float = 0.5) -> bool:
+    """Check if the agent meets the threshold.
+
+    Arguments:
+        agent (np.ndarray): single Agent array
+
+    Keyword Arguments:
+        threshold (float): probability threshold for filtering (default: {0.5})
+
+    Returns:
+        boolean
+    """
+    return (
+        np.sum(
+            agent["label_probabilities"][PERCEPTION_LABEL_INDICES_TO_KEEP],
+            axis=0
+        ) > threshold
+    )
 
 
 def filter_agents_by_track_id(agents: np.ndarray, track_id: int) -> np.ndarray:
@@ -67,7 +91,8 @@ def filter_agents_by_track_id(agents: np.ndarray, track_id: int) -> np.ndarray:
     Returns:
         np.ndarray -- Selected agent.
     """
-    return agents[np.nonzero(agents["track_id"] == track_id)[0]]
+    # return agents[np.nonzero(agents["track_id"] == track_id)[0]]
+    return agents[agents["track_id"] == track_id]
 
 
 def filter_agents_by_frames(frames: np.ndarray, agents: np.ndarray) -> List[np.ndarray]:
@@ -84,7 +109,9 @@ def filter_agents_by_frames(frames: np.ndarray, agents: np.ndarray) -> List[np.n
     """
     if frames.shape == ():
         frames = frames[None]  # add and axis if a single frame is passed
-    return [agents[get_agents_slice_from_frames(frame)] for frame in frames]
+    
+    return [agents[slice(*frame["agent_index_interval"])] for frame in frames]
+    # return [agents[get_agents_slice_from_frames(frame)] for frame in frames]
 
 
 def filter_tl_faces_by_frames(frames: np.ndarray, tl_faces: np.ndarray) -> List[np.ndarray]:

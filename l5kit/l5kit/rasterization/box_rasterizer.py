@@ -6,7 +6,7 @@ import numpy as np
 from l5kit.data.zarr_dataset import AGENT_DTYPE
 
 from ..data.filter import filter_agents_by_labels, filter_agents_by_track_id
-from ..geometry import rotation33_as_yaw, transform_points
+from ..geometry import rotation33_as_yaw, transform_points, transform_points_fast
 from ..geometry.transform import yaw_as_rotation33
 from .rasterizer import EGO_EXTENT_HEIGHT, EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, Rasterizer
 from .render_context import RenderContext
@@ -28,6 +28,9 @@ def get_ego_as_agent(frame: np.ndarray) -> np.ndarray:  # TODO this can be usefu
     ego_agent[0]["yaw"] = rotation33_as_yaw(frame["ego_rotation"])
     ego_agent[0]["extent"] = np.asarray((EGO_EXTENT_LENGTH, EGO_EXTENT_WIDTH, EGO_EXTENT_HEIGHT))
     return ego_agent
+
+
+_MIN_EXTENT = 0.5
 
 
 def draw_boxes(
@@ -55,20 +58,53 @@ def draw_boxes(
     else:
         im = np.zeros((raster_size[1], raster_size[0], 3), dtype=np.uint8)
 
-    box_world_coords = np.zeros((len(agents), 4, 2))
-    corners_base_coords = np.asarray([[-1, -1], [-1, 1], [1, 1], [1, -1]])
+    # box_world_coords = np.zeros((len(agents), 4, 2))
+    # corners_base_coords = np.asarray([[-1, -1], [-1, 1], [1, 1], [1, -1]])
+    _corners_base_coords = (np.asarray([[-1, -1], [-1, 1], [1, 1], [1, -1]]) / 2)[None, :, :]
 
     # compute the corner in world-space (start in origin, rotate and then translate)
-    for idx, agent in enumerate(agents):
-        corners = corners_base_coords * agent["extent"][:2] / 2  # corners in zero
-        r_m = yaw_as_rotation33(agent["yaw"])
-        box_world_coords[idx] = transform_points(corners, r_m) + agent["centroid"][:2]
-
-    box_raster_coords = transform_points(box_world_coords.reshape((-1, 2)), raster_from_world)
+    # for idx, agent in enumerate(agents):
+    #     corners = corners_base_coords * agent["extent"][:2] / 2  # corners in zero
+    #     r_m = yaw_as_rotation33(agent["yaw"])
+    #     box_world_coords[idx] = transform_points(corners, r_m) + agent["centroid"][:2]
+    # shape: (N agents)x(4 corners)x(2D coords)
+    corners_m = _corners_base_coords * np.maximum(agents["extent"], _MIN_EXTENT)[:, None, :2]  # corners in zero
+    # corners_m = _corners_base_coords * agents["extent"][:, None, :2]  # corners in zero
+    s = np.sin(agents['yaw'])
+    c = np.cos(agents['yaw'])
+    rotation_m = np.moveaxis(np.array([[c, -s], [s, c]]), 2, 0)
+    box_world_coords = np.einsum('bti,bji->btj', corners_m, rotation_m) + agents['centroid'][:, None, :2]
+    box_raster_coords = transform_points_fast(box_world_coords.reshape((-1, 2)), raster_from_world)
 
     # fillPoly wants polys in a sequence with points inside as (x,y)
     box_raster_coords = cv2_subpixel(box_raster_coords.reshape((-1, 4, 2)))
     cv2.fillPoly(im, box_raster_coords, color=color, lineType=cv2.LINE_AA, shift=CV2_SHIFT)
+    return im
+
+
+def draw_agent_velocity(
+    im: np.ndarray,
+    raster_size: Tuple[int, int],
+    raster_from_world: np.ndarray,
+    agent: np.ndarray,
+):
+    # (frame) * (1 for 2D coord later) assume 50 frams and 0.1s per frame
+    _extrapolate_time_base = np.arange(1, 51)[:, None] * 0.1
+
+    velocity = agent['velocity']
+    extrapolate_positions = (
+        velocity[None, :] * _extrapolate_time_base + agent['centroid'][None, :2]
+    )
+    raster_coords = transform_points_fast(extrapolate_positions, raster_from_world)
+    raster_coords = np.round(raster_coords).astype('int32')
+    mask = (
+        (0 <= raster_coords[:, 0]) & (raster_coords[:, 0] < raster_size[0]) &
+        (0 <= raster_coords[:, 1]) & (raster_coords[:, 1] < raster_size[1])
+    )
+    raster_coords = raster_coords[mask]
+    # plot onto the image
+    # Note the first dimension in the image is y, then x
+    im[tuple(raster_coords[:, ::-1].T)] = 250  # any color other than 255 for distinction
     return im
 
 
@@ -96,7 +132,7 @@ class BoxRasterizer(Rasterizer):
         history_tl_faces: List[np.ndarray],
         agent: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        # all frames are drawn relative to this one"
+        # all frames are drawn relative to this one
         frame = history_frames[0]
         if agent is None:
             ego_translation_m = history_frames[0]["ego_translation"]
@@ -108,7 +144,7 @@ class BoxRasterizer(Rasterizer):
         raster_from_world = self.render_context.raster_from_world(ego_translation_m, ego_yaw_rad)
 
         # this ensures we always end up with fixed size arrays, +1 is because current time is also in the history
-        out_shape = (self.raster_size[1], self.raster_size[0], self.history_num_frames + 1)
+        out_shape = (self.history_num_frames + 1, self.raster_size[1], self.raster_size[0])
         agents_images = np.zeros(out_shape, dtype=np.uint8)
         ego_images = np.zeros(out_shape, dtype=np.uint8)
 
@@ -130,11 +166,17 @@ class BoxRasterizer(Rasterizer):
                     agents_image = draw_boxes(self.raster_size, raster_from_world, np.append(agents, av_agent), 255)
                     ego_image = draw_boxes(self.raster_size, raster_from_world, agent_ego, 255)
 
-            agents_images[..., i] = agents_image
-            ego_images[..., i] = ego_image
+            agents_images[i] = agents_image
+            ego_images[i] = ego_image
+
+        # if agent is not None:
+        #     # add extrapolation dots from velocity to the image at 0
+        #     ego_images[0] = draw_agent_velocity(
+        #         ego_images[0], self.raster_size, raster_from_world, agent
+        #     )
 
         # combine such that the image consists of [agent_t, agent_t-1, agent_t-2, ego_t, ego_t-1, ego_t-2]
-        out_im = np.concatenate((agents_images, ego_images), -1)
+        out_im = np.concatenate((agents_images, ego_images), 0)
 
         return out_im.astype(np.float32) / 255
 
