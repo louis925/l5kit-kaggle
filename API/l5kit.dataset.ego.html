@@ -190,19 +190,39 @@
   <div class="section" id="module-l5kit.dataset.ego">
 <span id="l5kit-dataset-ego-module"></span><h1>l5kit.dataset.ego module<a class="headerlink" href="#module-l5kit.dataset.ego" title="Permalink to this headline">¶</a></h1>
 <dl class="py class">
+<dt id="l5kit.dataset.ego.Dataset">
+<em class="property">class </em><code class="sig-prename descclassname">l5kit.dataset.ego.</code><code class="sig-name descname">Dataset</code><a class="headerlink" href="#l5kit.dataset.ego.Dataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>An abstract class representing a <a class="reference internal" href="#l5kit.dataset.ego.Dataset" title="l5kit.dataset.ego.Dataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></a>.</p>
+<p>All datasets that represent a map from keys to data samples should subclass
+it. All subclasses should overwrite <code class="xref py py-meth docutils literal notranslate"><span class="pre">__getitem__()</span></code>, supporting fetching a
+data sample for a given key. Subclasses could also optionally overwrite
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">__len__()</span></code>, which is expected to return the size of the dataset by many
+<code class="xref py py-class docutils literal notranslate"><span class="pre">Sampler</span></code> implementations and the default options
+of <code class="xref py py-class docutils literal notranslate"><span class="pre">DataLoader</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="xref py py-class docutils literal notranslate"><span class="pre">DataLoader</span></code> by default constructs a index
+sampler that yields integral indices.  To make it work with a map-style
+dataset with non-integral indices/keys, a custom sampler must be provided.</p>
+</div>
+</dd></dl>
+
+<dl class="py class">
 <dt id="l5kit.dataset.ego.EgoDataset">
 <em class="property">class </em><code class="sig-prename descclassname">l5kit.dataset.ego.</code><code class="sig-name descname">EgoDataset</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">cfg</span><span class="p">:</span> <span class="n">dict</span></em>, <em class="sig-param"><span class="n">zarr_dataset</span><span class="p">:</span> <span class="n"><a class="reference internal" href="l5kit.data.zarr_dataset.html#l5kit.data.zarr_dataset.ChunkedDataset" title="l5kit.data.zarr_dataset.ChunkedDataset">l5kit.data.zarr_dataset.ChunkedDataset</a></span></em>, <em class="sig-param"><span class="n">rasterizer</span><span class="p">:</span> <span class="n"><a class="reference internal" href="l5kit.rasterization.rasterizer.html#l5kit.rasterization.rasterizer.Rasterizer" title="l5kit.rasterization.rasterizer.Rasterizer">l5kit.rasterization.rasterizer.Rasterizer</a></span></em>, <em class="sig-param"><span class="n">perturbation</span><span class="p">:</span> <span class="n">Optional<span class="p">[</span><a class="reference internal" href="l5kit.kinematic.perturbation.html#l5kit.kinematic.perturbation.Perturbation" title="l5kit.kinematic.perturbation.Perturbation">l5kit.kinematic.perturbation.Perturbation</a><span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#l5kit.dataset.ego.EgoDataset" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.utils.data.dataset.Dataset</span></code></p>
+<dd><p>Bases: <a class="reference internal" href="#l5kit.dataset.ego.Dataset" title="l5kit.dataset.ego.Dataset"><code class="xref py py-class docutils literal notranslate"><span class="pre">l5kit.dataset.ego.Dataset</span></code></a></p>
 <dl class="py method">
 <dt id="l5kit.dataset.ego.EgoDataset.get_frame">
-<code class="sig-name descname">get_frame</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">scene_index</span><span class="p">:</span> <span class="n">int</span></em>, <em class="sig-param"><span class="n">state_index</span><span class="p">:</span> <span class="n">int</span></em>, <em class="sig-param"><span class="n">track_id</span><span class="p">:</span> <span class="n">Optional<span class="p">[</span>int<span class="p">]</span></span> <span class="o">=</span> <span class="default_value">None</span></em><span class="sig-paren">)</span> &#x2192; dict<a class="headerlink" href="#l5kit.dataset.ego.EgoDataset.get_frame" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">get_frame</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">scene_index</span><span class="p">:</span> <span class="n">int</span></em>, <em class="sig-param"><span class="n">state_index</span><span class="p">:</span> <span class="n">int</span></em>, <em class="sig-param"><span class="n">total_agent_id</span><span class="p">:</span> <span class="n">int</span></em><span class="sig-paren">)</span> &#x2192; dict<a class="headerlink" href="#l5kit.dataset.ego.EgoDataset.get_frame" title="Permalink to this definition">¶</a></dt>
 <dd><p>A utility function to get the rasterisation and trajectory target for a given agent in a given frame</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>scene_index</strong> (<em>int</em>) – the index of the scene in the zarr</p></li>
 <li><p><strong>state_index</strong> (<em>int</em>) – a relative frame index in the scene</p></li>
-<li><p><strong>track_id</strong> (<em>Optional</em><em>[</em><em>int</em><em>]</em>) – the agent to rasterize or None for the AV</p></li>
+<li><p><strong>track_id</strong> (<em>#</em>) – the agent to rasterize or None for the AV</p></li>
+<li><p><strong>total_agent_id</strong> (<em>int</em>) – the total_agent_id of the agent to rasterize or -1 for the AV</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>

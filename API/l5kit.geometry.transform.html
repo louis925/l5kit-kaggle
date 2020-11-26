@@ -261,6 +261,16 @@ coordinates. If no altitude is given, altitude 0 is assumed.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt id="l5kit.geometry.transform.inv_agent_pose">
+<code class="sig-prename descclassname">l5kit.geometry.transform.</code><code class="sig-name descname">inv_agent_pose</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">agent_centroid_m</span><span class="p">:</span> <span class="n">numpy.ndarray</span></em>, <em class="sig-param"><span class="n">agent_yaw_rad</span><span class="p">:</span> <span class="n">float</span></em><span class="sig-paren">)</span> &#x2192; numpy.ndarray<a class="headerlink" href="#l5kit.geometry.transform.inv_agent_pose" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt id="l5kit.geometry.transform.rotate_agent_from_world">
+<code class="sig-prename descclassname">l5kit.geometry.transform.</code><code class="sig-name descname">rotate_agent_from_world</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">agent_yaw_rad</span><span class="p">:</span> <span class="n">float</span></em><span class="sig-paren">)</span> &#x2192; numpy.ndarray<a class="headerlink" href="#l5kit.geometry.transform.rotate_agent_from_world" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
 <dt id="l5kit.geometry.transform.rotation33_as_yaw">
 <code class="sig-prename descclassname">l5kit.geometry.transform.</code><code class="sig-name descname">rotation33_as_yaw</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">rotation</span><span class="p">:</span> <span class="n">numpy.ndarray</span></em><span class="sig-paren">)</span> &#x2192; float<a class="headerlink" href="#l5kit.geometry.transform.rotation33_as_yaw" title="Permalink to this definition">¶</a></dt>
 <dd><p>Compute the yaw component of given 3x3 rotation matrix.</p>
@@ -313,6 +323,49 @@ For 2D points only the first 2x3 part of the matrix will be used.</p>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>array of shape (N,2) for 2D input points, or (N,3) points for 3D input points</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="l5kit.geometry.transform.transform_points_fast">
+<code class="sig-prename descclassname">l5kit.geometry.transform.</code><code class="sig-name descname">transform_points_fast</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">points</span><span class="p">:</span> <span class="n">numpy.ndarray</span></em>, <em class="sig-param"><span class="n">transf_matrix</span><span class="p">:</span> <span class="n">numpy.ndarray</span></em><span class="sig-paren">)</span> &#x2192; numpy.ndarray<a class="headerlink" href="#l5kit.geometry.transform.transform_points_fast" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transform points using transformation matrix.
+Note this function assumes points.shape[1] == matrix.shape[1] - 1, which means that the last
+row in the matrix does not influence the final result.
+For 2D points only the first 2x3 part of the matrix will be used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>points</strong> (<em>np.ndarray</em>) – Input points (Nx2) or (Nx3).</p></li>
+<li><p><strong>transf_matrix</strong> (<em>np.ndarray</em>) – 3x3 or 4x4 transformation matrix for 2D and 3D input respectively</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>array of shape (N,2) for 2D input points, or (N,3) points for 3D input points</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt id="l5kit.geometry.transform.transform_world_to_agent">
+<code class="sig-prename descclassname">l5kit.geometry.transform.</code><code class="sig-name descname">transform_world_to_agent</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">points</span><span class="p">:</span> <span class="n">numpy.ndarray</span></em>, <em class="sig-param"><span class="n">shift</span><span class="p">:</span> <span class="n">numpy.ndarray</span></em>, <em class="sig-param"><span class="n">rotation_matrix</span><span class="p">:</span> <span class="n">numpy.ndarray</span></em><span class="sig-paren">)</span> &#x2192; numpy.ndarray<a class="headerlink" href="#l5kit.geometry.transform.transform_world_to_agent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transform points by subtracting shift then apply rotation_matrix</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>points</strong> (<em>np.ndarray</em>) – Input points (Nx2).</p></li>
+<li><p><strong>rotation_matrix</strong> (<em>np.ndarray</em>) – 2x2 rotation matrix.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>coordinate array of shape (N, 2) in agent space</p>
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>np.ndarray</p>
